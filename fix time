@@ -193,8 +193,8 @@ class RealTimePlotter:
    def update_countdown_label(self):
        elapsed_time = time.time() - self.countdown_start_time
 
-       if elapsed_time <= 60:
-           self.countdown_time = 60 - int(elapsed_time)
+       self.countdown_time = 60 - int(elapsed_time)
+       if self.countdown_time >= 0:
            minutes = self.countdown_time // 60
            seconds = self.countdown_time % 60
            self.countdown_label.config(text=f"Countdown: {minutes:02}:{seconds:02}")
@@ -260,7 +260,7 @@ class RealTimePlotter:
            mean = np.mean(initial_data)
            self.threshold = mean - 0.0012 * mean # threshold for good drawing
            self.highThreshold = mean + 0.0002 * mean #touch threshold
-           self.puncThreshold = mean - 0.0002 * mean #puncture threshold
+           self.puncThreshold = mean - 0.00015 * mean #puncture threshold
            self.threshold_label.config(text=f'Threshold: {self.threshold:.2f}')
        else:
            self.threshold = 15000
