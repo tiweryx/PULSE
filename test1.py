@@ -24,9 +24,9 @@ class RealTimePlotter:
         self.paused = False
         self.start_time = None
         self.time_list = []
-        self.time_list_plot = deque([] , maxlen=1500)
+        self.time_list_plot = deque([] , maxlen=100)
         self.data_list = []
-        self.data_list_plot = deque([] , maxlen=1500)
+        self.data_list_plot = deque([] , maxlen=100)
         self.threshold = 15000
         self.chart_threshold = 650000
         self.first_exceeding_time = None
@@ -48,11 +48,6 @@ class RealTimePlotter:
 
         self.event_list = []  # List to store important events
 
-        self.serial_port = self.find_arduino_port()
-        if self.serial_port:
-            print(f"Connected to {self.serial_port.port}")
-        else:
-            print("Arduino not found")
 
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvasTkAgg(self.fig, master=root)
@@ -83,13 +78,13 @@ class RealTimePlotter:
         ports = list(serial.tools.list_ports.comports())
         for port in ports:
             if "Arduino" in port.description:
-                return serial.Serial(port.device, 9600, timeout=1)
+                return serial.Serial(port.device, 57600, timeout=1)
         return None
 
     def setup_animation(self):
-        self.ani = animation.FuncAnimation(self.fig, self.animate , interval=100 , blit=True)
+        self.ani = animation.FuncAnimation(self.fig, self.animate , interval=50)
 
-    def animate(self, i):
+    def animate(self , i):
         if not self.running or self.paused or not self.serial_port:
             return
 
@@ -99,12 +94,12 @@ class RealTimePlotter:
         print(f"Received data: {arduino_data_string}")
 
         try:
-            arduino_data_float = float(arduino_data_string)
+            arduino_data_int = int(arduino_data_string)
             self.time_list.append(current_time)
             self.time_list_plot.append(current_time)
-            self.data_list.append(arduino_data_float)
-            self.data_list_plot.append(arduino_data_float)
-            self.dataQueue.append(arduino_data_float)
+            self.data_list.append(arduino_data_int)
+            self.data_list_plot.append(arduino_data_int)
+            self.dataQueue.append(arduino_data_int)
 
             if len(self.dataQueue) >= 3 and self.dataQueue[-3] < self.puncThreshold:
                 if self.dataQueue[-2] <= self.highThreshold and self.dataQueue[-1] <= self.highThreshold:
@@ -115,7 +110,7 @@ class RealTimePlotter:
                         self.event_list.append(self.startpuncflag)
 
 
-            if arduino_data_float < self.threshold:
+            if arduino_data_int < self.threshold:
                 if self.last_below_threshold_time is None:
                     self.last_below_threshold_time = time.time()
                 else:
@@ -159,6 +154,7 @@ class RealTimePlotter:
     def start_sequence(self):
         self.calibrate_threshold()
         self.start_countdown()
+        #self.start_animation()
 
     def start_countdown(self):
         if self.countdown_label is None:
@@ -211,8 +207,19 @@ class RealTimePlotter:
     def start_animation(self):
         if not self.running:
             self.start_time = time.time() - (self.time_list_plot[-1] if self.time_list_plot else 0)
+            #port flushing
+            self.serial_port.close()
+            time.sleep(0.5)
+            self.serial_port = self.find_arduino_port()
+            if self.serial_port:
+                print(f"Connected to {self.serial_port.port}")
+            else:
+                print("Arduino not found")
+            #finish port flushing
             self.running = True
             self.paused = False
+
+
 
     def stop_animation(self):
         self.running = False
@@ -243,21 +250,27 @@ class RealTimePlotter:
         self.calibration_label.config(text='Calibrating threshold')
         self.root.update_idletasks()
 
+        self.serial_port = self.find_arduino_port()
+        if self.serial_port:
+            print(f"Connected to {self.serial_port.port}")
+        else:
+            print("Arduino not found")
+
         initial_data = []
         start_time = time.time()
         while time.time() - start_time < 10:
             self.serial_port.write(b'g')
             arduino_data_string = self.serial_port.readline().decode('ascii').strip()
             try:
-                arduino_data_float = float(arduino_data_string)
-                initial_data.append(arduino_data_float)
+                arduino_data_int = int(arduino_data_string)
+                initial_data.append(arduino_data_int )
             except ValueError:
                 pass
         if initial_data:
             mean = np.mean(initial_data)
             self.threshold = mean - 0.0012 * mean
-            self.highThreshold = mean + 0.0002 * mean
-            self.puncThreshold = mean - 0.0002 * mean
+            self.highThreshold = mean + 0.00035 * mean
+            self.puncThreshold = mean - 0.0003 * mean
             self.threshold_label.config(text=f'Threshold: {self.threshold:.2f}')
         else:
             self.threshold = 15000
