@@ -45,6 +45,8 @@ class RealTimePlotter:
         self.puncLabel = 0
         self.puncEvent = False
         self.startpuncflag = None
+        self.Mawindow = 50
+        self.malist = deque([] , maxlen= 50 )
 
         self.event_list = []  # List to store important events
 
@@ -100,6 +102,13 @@ class RealTimePlotter:
             self.data_list.append(arduino_data_int)
             self.data_list_plot.append(arduino_data_int)
             self.dataQueue.append(arduino_data_int)
+            self.malist.append(arduino_data_int)
+
+            if len(self.malist) == self.Mawindow:
+                Mavg = np.mean(self.malist)
+                self.threshold = Mavg - (0.0015*Mavg)
+                self.highThreshold = Mavg + (0.00025*Mavg)
+                self.puncThreshold = Mavg - (0.00029*Mavg)
 
             if len(self.dataQueue) >= 3 and self.dataQueue[-3] < self.puncThreshold:
                 if self.dataQueue[-2] <= self.highThreshold and self.dataQueue[-1] <= self.highThreshold:
@@ -113,13 +122,13 @@ class RealTimePlotter:
             if arduino_data_int < self.threshold:
                 if self.last_below_threshold_time is None:
                     self.last_below_threshold_time = time.time()
-                else:
-                    elapsed_time = time.time() - self.last_below_threshold_time
-                    if elapsed_time >= 3:
-                        self.great_flag = True
             else:
-                self.great_flag = False
-                self.last_below_threshold_time = None
+                if self.last_below_threshold_time is not None:
+                    elapsed_time = time.time() - self.last_below_threshold_time
+                    if elapsed_time >= 6.5:
+                        messagebox.showinfo("Result", "Great")
+                        self.great_flag = True
+                    self.last_below_threshold_time = None
 
         except ValueError as e:
             print(f"Error parsing data: {e}")
@@ -292,14 +301,8 @@ class RealTimePlotter:
                 raw_data_path = os.path.join(export_path, "raw_data.csv")
                 with open(raw_data_path, 'w', newline='') as csvfile:
                     writer = csv.writer(csvfile)
-                    writer.writerow(['Time (s)', 'Value', 'Event'])
-                    for t, v in zip(self.time_list, self.data_list):
-                        event = ''
-                        for event_time, event_desc in self.event_list:
-                            if t == event_time:
-                                event = event_desc
-                                break
-                        writer.writerow([t, v, event])
+                    writer.writerow(['Time (s)', 'Value'])
+                    writer.writerows(zip(self.time_list, self.data_list))
 
                 graph_path = os.path.join(export_path, "graph.png")
                 self.fig.savefig(graph_path)
