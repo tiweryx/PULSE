@@ -24,9 +24,9 @@ class RealTimePlotter:
         self.paused = False
         self.start_time = None
         self.time_list = []
-        self.time_list_plot = deque([], maxlen=100)
+        self.time_list_plot = deque([], maxlen=50)
         self.data_list = []
-        self.data_list_plot = deque([], maxlen=100)
+        self.data_list_plot = deque([], maxlen=50)
         self.threshold = 15000
         self.chart_threshold = 650000
         self.first_exceeding_time = None
