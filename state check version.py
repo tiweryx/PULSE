@@ -52,7 +52,7 @@ class RealTimePlotter:
         self.puncture_state_active = False
         self.last_data_value = 0
         self.stable_data_count = 0
-        self.stable_data_threshold = 2
+        self.stable_data_threshold = 5
 
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvasTkAgg(self.fig, master=root)
@@ -79,6 +79,9 @@ class RealTimePlotter:
 
         self.state_label = tk.Label(root , text="State : waiting" , font=('Courier' , 20))
         self.state_label.place(x=10 , y=50)
+
+        self.stablecountlabel = tk.Label(root , text=f'Stable data count : {self.stable_data_count}' , font=('Courier' , 20))
+        self.stablecountlabel.place(x=10 , y=20)
 
         self.setup_animation()
 
@@ -139,24 +142,32 @@ class RealTimePlotter:
                     if elapsed_time < 3:
                         self.touch_state()
                     self.last_below_threshold_time = None
-                    self.puncture_state_active = False
+                    #self.puncture_state_active = False
+                    #print('reset puncture state')
 
 
             # detect data in puncture state
             if self.puncture_state_active:
+                print("puncture state activated")
                 if arduino_data_int > self.threshold:
-                    if self.last_data_value is not None and arduino_data_int == self.last_data_value:
+                    print('check point reached')
+                    if arduino_data_int == self.last_data_value:
+                        print("stabled!!!!!!!!!!!!")
                         self.stable_data_count += 1
+                        self.updatestable()
                         if self.stable_data_count >= self.stable_data_threshold:
                             self.stop_animation()  # Stop the animation if data is stable
 
                     else:
                         self.stable_data_count = 0
+                        print('reset stable count')
                     self.last_data_value = arduino_data_int
-            else: #puncture state false
+                    print('record last data')
+            #else: #puncture state false
                     # if data goes above threshold, reset puncture state
-                    self.puncture_state_active = False
-                    self.last_data_value = None
+                    #print('reset puncture state')
+                    #self.puncture_state_active = False
+                    #self.last_data_value = 0
 
             if arduino_data_int < self.threshold:
                 if self.last_below_threshold_time is None:
@@ -202,12 +213,13 @@ class RealTimePlotter:
 
     def touch_state(self):
         print("Touch State detected")
-        self.state_label.config(text='State : Touch')
+        self.puncture_state_active = False
+        self.state_label.config(text=f'State : {self.puncture_state_active}')
 
     def puncture_state(self):
         print("Puncture State detected")
         self.puncture_state_active = True
-        self.state_label.config(text='State : Puncture')
+        self.state_label.config(text=f'State : {self.puncture_state_active}')
 
     def start_sequence(self):
         self.calibrate_threshold()
@@ -249,6 +261,9 @@ class RealTimePlotter:
 
     def updatePuncCount(self):
         self.puncCount_label.config(text=f"Puncture Count: {self.puncCount}")
+
+    def updatestable(self):
+        self.stablecountlabel.config(text=f'Stable punc count : {self.stable_data_count}')
 
     def update_countdown_label(self):
         if self.running:
