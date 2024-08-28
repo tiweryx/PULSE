@@ -144,14 +144,15 @@ class RealTimePlotter:
 
             # detect data in puncture state
             if self.puncture_state_active:
-                if self.last_data_value is not None and arduino_data_int == self.last_data_value:
-                    self.stable_data_count += 1
-                    if self.stable_data_count >= self.stable_data_threshold:
-                        self.stop_animation()  # Stop the animation if data is stable
+                if arduino_data_int > self.threshold:
+                    if self.last_data_value is not None and arduino_data_int == self.last_data_value:
+                        self.stable_data_count += 1
+                        if self.stable_data_count >= self.stable_data_threshold:
+                            self.stop_animation()  # Stop the animation if data is stable
 
-                else:
-                    self.stable_data_count = 0
-                self.last_data_value = arduino_data_int
+                    else:
+                        self.stable_data_count = 0
+                    self.last_data_value = arduino_data_int
             else: #puncture state false
                     # if data goes above threshold, reset puncture state
                     self.puncture_state_active = False
