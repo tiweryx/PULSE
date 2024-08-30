@@ -11,6 +11,7 @@ import numpy as np
 import csv
 import os
 from collections import deque
+import tkinter.simpledialog as simpledialog
 from itertools import islice
 
 
@@ -47,6 +48,9 @@ class RealTimePlotter:
         self.startpuncflag = None
         self.Mawindow = 50
         self.malist = deque([], maxlen=50)
+
+        self.punctureStateList = []
+        self.punctureStateTime = []
 
         self.event_list = []  # List to store important events
         self.puncture_state_active = False
@@ -148,11 +152,10 @@ class RealTimePlotter:
 
             # detect data in puncture state
             if self.puncture_state_active:
-                print("puncture state activated")
+                self.punctureStateList.append(arduino_data_int)
+                self.punctureStateTime.append(current_time)
                 if arduino_data_int > self.threshold:
-                    print('check point reached')
                     if arduino_data_int == self.last_data_value:
-                        print("stabled!!!!!!!!!!!!")
                         self.stable_data_count += 1
                         self.updatestable()
                         if self.stable_data_count >= self.stable_data_threshold:
@@ -168,17 +171,6 @@ class RealTimePlotter:
                     #print('reset puncture state')
                     #self.puncture_state_active = False
                     #self.last_data_value = 0
-
-            if arduino_data_int < self.threshold:
-                if self.last_below_threshold_time is None:
-                    self.last_below_threshold_time = time.time()
-            else:
-                if self.last_below_threshold_time is not None:
-                    elapsed_time = time.time() - self.last_below_threshold_time
-                    if elapsed_time >= 6.5:
-                        messagebox.showinfo("Result", "Great")
-                        self.great_flag = True
-                    self.last_below_threshold_time = None
 
         except ValueError as e:
             print(f"Error parsing data: {e}")
@@ -296,12 +288,17 @@ class RealTimePlotter:
         self.running = False
         self.paused = True
         self.last_below_threshold_time = None
-        if self.great_flag:
+        puncture_start_time = self.punctureStateTime[0]
+        min_value = min(self.punctureStateList)
+        min_value_index = self.punctureStateList.index(min_value)
+        min_value_time = self.punctureStateTime[min_value_index]
+        elapsed_time = min_value_time - puncture_start_time
+        if elapsed_time > 6 :
             self.event_list.append((time.time() - self.start_time, "Great blood drawing finished"))
             messagebox.showinfo('Result', 'Great blood drawing!!!')
             self.great_flag = False
         else:
-            messagebox.showinfo('Result', 'Not fall below threshold')
+            messagebox.showinfo('Result', 'Try again')
 
     def reset_graph(self):
         self.running = False
@@ -348,20 +345,43 @@ class RealTimePlotter:
             self.threshold_label.config(text=f"Threshold: {self.threshold}")
         self.calibration_label.config(text='')
 
+    import tkinter.simpledialog as simpledialog
+
     def export_data(self):
+        # Prompt the user to enter a file name
+        file_name = simpledialog.askstring("Input", "Enter file name for export (without extension):")
+
+        if not file_name:
+            messagebox.showwarning("Export Canceled", "No file name provided. Export canceled.")
+            return
+
         export_path = filedialog.askdirectory(title="Select Export Directory")
         if export_path:
             try:
-                raw_data_path = os.path.join(export_path, "raw_data.csv")
-                with open(raw_data_path, 'w', newline='') as csvfile:
+                combined_data_path = os.path.join(export_path, f"{file_name}.csv")
+                with open(combined_data_path, 'w', newline='') as csvfile:
                     writer = csv.writer(csvfile)
-                    writer.writerow(['Time (s)', 'Value'])
-                    writer.writerows(zip(self.time_list, self.data_list))
+                    # Write header
+                    writer.writerow(['Time (s)', 'Value', 'Puncture Time (s)', 'Puncture Value'])
 
-                graph_path = os.path.join(export_path, "graph.png")
-                self.fig.savefig(graph_path)
+                    # Determine the maximum length among the lists
+                    max_length = max(len(self.time_list), len(self.data_list), len(self.punctureStateTime),
+                                     len(self.punctureStateList))
 
-                messagebox.showinfo("Export Successful", f"Data exported to {export_path}")
+                    # Pad lists to ensure they all have the same length
+                    time_list_padded = self.time_list + [None] * (max_length - len(self.time_list))
+                    data_list_padded = self.data_list + [None] * (max_length - len(self.data_list))
+                    punctureStateTime_padded = self.punctureStateTime + [None] * (
+                                max_length - len(self.punctureStateTime))
+                    punctureStateList_padded = self.punctureStateList + [None] * (
+                                max_length - len(self.punctureStateList))
+
+                    # Write rows
+                    for t, d, pt, pd in zip(time_list_padded, data_list_padded, punctureStateTime_padded,
+                                            punctureStateList_padded):
+                        writer.writerow([t, d, pt, pd])
+
+                messagebox.showinfo("Export Successful", f"Data exported to {os.path.join(export_path, file_name)}")
             except Exception as e:
                 messagebox.showerror("Export Failed", str(e))
 
