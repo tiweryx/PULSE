@@ -84,8 +84,6 @@ class RealTimePlotter:
         self.state_label = tk.Label(root , text="State : waiting" , font=('Courier' , 20))
         self.state_label.place(x=10 , y=50)
 
-        self.stablecountlabel = tk.Label(root , text=f'Stable data count : {self.stable_data_count}' , font=('Courier' , 20))
-        self.stablecountlabel.place(x=10 , y=20)
 
         self.setup_animation()
 
@@ -123,13 +121,6 @@ class RealTimePlotter:
                 self.highThreshold = Mavg + (0.00025 * Mavg)
                 self.puncThreshold = Mavg - (0.00029 * Mavg)
 
-            if len(self.dataQueue) >= 3 and self.dataQueue[-3] < self.puncThreshold:
-                if self.dataQueue[-2] <= self.highThreshold and self.dataQueue[-1] <= self.highThreshold:
-                    self.puncCount += 1
-                    self.updatePuncCount()
-                    if self.startpuncflag is None:
-                        self.startpuncflag = time.time() - self.start_time
-                        self.event_list.append(self.startpuncflag)
             # check state
             if arduino_data_int < self.threshold:
                 if self.last_below_threshold_time is None:
@@ -157,7 +148,6 @@ class RealTimePlotter:
                 if arduino_data_int > self.threshold:
                     if arduino_data_int == self.last_data_value:
                         self.stable_data_count += 1
-                        self.updatestable()
                         if self.stable_data_count >= self.stable_data_threshold:
                             self.stop_animation()  # Stop the animation if data is stable
 
@@ -206,12 +196,12 @@ class RealTimePlotter:
     def touch_state(self):
         print("Touch State detected")
         self.puncture_state_active = False
-        self.state_label.config(text=f'State : {self.puncture_state_active}')
+        self.state_label.config(text='State : Touch')
 
     def puncture_state(self):
         print("Puncture State detected")
         self.puncture_state_active = True
-        self.state_label.config(text=f'State : {self.puncture_state_active}')
+        self.state_label.config(text="State : Puncture")
 
     def start_sequence(self):
         self.calibrate_threshold()
@@ -251,12 +241,6 @@ class RealTimePlotter:
         self.countdown_start_time = time.time()
         self.update_countdown_label()
 
-    def updatePuncCount(self):
-        self.puncCount_label.config(text=f"Puncture Count: {self.puncCount}")
-
-    def updatestable(self):
-        self.stablecountlabel.config(text=f'Stable punc count : {self.stable_data_count}')
-
     def update_countdown_label(self):
         if self.running:
             elapsed_time = time.time() - self.countdown_start_time
@@ -268,6 +252,7 @@ class RealTimePlotter:
                 self.root.after(1000, self.update_countdown_label)
             else:
                 self.countdown_label.config(text="Countdown Finished")
+                self.stop_animation()
 
     def start_animation(self):
         if not self.running:
@@ -288,17 +273,21 @@ class RealTimePlotter:
         self.running = False
         self.paused = True
         self.last_below_threshold_time = None
+        #self.serial_port.close()
+        #time.sleep(0.5)
         puncture_start_time = self.punctureStateTime[0]
         min_value = min(self.punctureStateList)
         min_value_index = self.punctureStateList.index(min_value)
         min_value_time = self.punctureStateTime[min_value_index]
         elapsed_time = min_value_time - puncture_start_time
         if elapsed_time > 6 :
-            self.event_list.append((time.time() - self.start_time, "Great blood drawing finished"))
             messagebox.showinfo('Result', 'Great blood drawing!!!')
             self.great_flag = False
         else:
             messagebox.showinfo('Result', 'Try again')
+
+
+
 
     def reset_graph(self):
         self.running = False
@@ -312,7 +301,9 @@ class RealTimePlotter:
         self.ax.set_title("Arduino Data")
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Value")
-        self.canvas.draw()
+        self.serial_port.close()
+        time.sleep(0.5)
+        self.start_sequence()
 
     def calibrate_threshold(self):
         self.calibration_label.config(text='Calibrating threshold')
